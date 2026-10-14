@@ -766,6 +766,159 @@ button {
   color: var(--danger);
 }
 
+/* ===== Quest Deletion Safety ===== */
+.delete-confirm-box {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.45);
+  padding: 0.15rem 0.45rem;
+  border-radius: 6px;
+  animation: fadeIn 0.15s ease-out;
+}
+
+.confirm-text {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #fca5a5;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.confirm-yes-btn {
+  background: #ef4444 !important;
+  color: #fff !important;
+  border: none !important;
+  border-radius: 4px;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.72rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: transform 0.1s, background 0.15s;
+}
+
+.confirm-yes-btn:hover {
+  background: #dc2626 !important;
+  transform: scale(1.1);
+}
+
+.confirm-no-btn {
+  background: rgba(255, 255, 255, 0.12) !important;
+  color: #e2e8f0 !important;
+  border: none !important;
+  border-radius: 4px;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.72rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: transform 0.1s, background 0.15s;
+}
+
+.confirm-no-btn:hover {
+  background: rgba(255, 255, 255, 0.25) !important;
+  transform: scale(1.1);
+}
+
+/* ===== Floating XP & Completion Animations ===== */
+.floating-xp-pop {
+  position: absolute;
+  top: 40%;
+  left: 50%;
+  pointer-events: none;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  animation: floatUpAndFade 1.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.xp-pop-num {
+  font-size: 1.3rem;
+  font-weight: 900;
+  color: #fbbf24;
+  text-shadow: 0 0 12px rgba(251, 191, 36, 0.75), 0 2px 4px rgba(0, 0, 0, 0.85);
+  letter-spacing: 0.04em;
+}
+
+.xp-pop-crit {
+  font-size: 0.7rem;
+  font-weight: 800;
+  color: #f97316;
+  text-shadow: 0 0 10px rgba(249, 115, 22, 0.8);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+@keyframes floatUpAndFade {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, 15px) scale(0.8);
+  }
+  20% {
+    opacity: 1;
+    transform: translate(-50%, -6px) scale(1.15);
+  }
+  75% {
+    opacity: 1;
+    transform: translate(-50%, -32px) scale(1.02);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -52px) scale(0.9);
+  }
+}
+
+.quest-flash-anim {
+  animation: completeCardPulse 0.75s ease-out;
+}
+
+@keyframes completeCardPulse {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 0 rgba(74, 222, 128, 0);
+  }
+  35% {
+    transform: scale(1.025);
+    box-shadow: 0 0 30px rgba(74, 222, 128, 0.55), inset 0 0 16px rgba(74, 222, 128, 0.2);
+    border-color: #4ade80 !important;
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 rgba(74, 222, 128, 0);
+  }
+}
+
+.streak-fire-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  color: #f59e0b !important;
+  font-weight: 800 !important;
+  animation: flameFlicker 1.6s ease-in-out infinite alternate;
+}
+
+@keyframes flameFlicker {
+  0% {
+    filter: drop-shadow(0 0 2px rgba(245, 158, 11, 0.4));
+    transform: scale(1);
+  }
+  100% {
+    filter: drop-shadow(0 0 8px rgba(239, 68, 68, 0.8));
+    transform: scale(1.06);
+  }
+}
+
 .quest-title {
   font-size: 1.05rem;
   font-weight: 600;

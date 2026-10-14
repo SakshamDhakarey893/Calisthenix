@@ -391,57 +391,66 @@ export interface MealRecipeGuide {
   cookTime: string;
   difficulty: 'Quick (Under 10 mins)' | 'Medium (15-20 mins)' | 'Easy Meal Prep';
   steps: string[];
+  instructions?: string[];
   chefTip: string;
 }
 
 export function getMealRecipeGuide(meal: MealItem): MealRecipeGuide {
   if (meal.category === 'breakfast') {
+    const steps = [
+      `Assemble primary complex carb base (${meal.ingredients[0] || 'grains'}) in a bowl or skillet.`,
+      `Incorporate ${meal.ingredients[1] || 'protein source'} and cook or stir vigorously over medium flame until evenly blended.`,
+      `Garnish with ${meal.ingredients[2] || 'healthy fats and seeds'}. Serve hot alongside 500ml water to kickstart hydration.`,
+    ];
     return {
       prepTime: '5-10 Mins',
       cookTime: '5-8 Mins',
       difficulty: 'Quick (Under 10 mins)',
-      steps: [
-        `Assemble primary complex carb base (${meal.ingredients[0] || 'grains'}) in a bowl or skillet.`,
-        `Incorporate ${meal.ingredients[1] || 'protein source'} and cook or stir vigorously over medium flame until evenly blended.`,
-        `Garnish with ${meal.ingredients[2] || 'healthy fats and seeds'}. Serve hot alongside 500ml water to kickstart hydration.`,
-      ],
+      steps,
+      instructions: steps,
       chefTip: 'Measure your protein powder or egg portions precisely for optimal morning anabolic synthesis.',
     };
   } else if (meal.category === 'lunch') {
+    const steps = [
+      `Preheat skillet or grill pan with light avocado or olive oil over medium-high heat.`,
+      `Season ${meal.ingredients[0]} with sea salt, black pepper, and garlic powder; sear until golden brown and cooked thoroughly.`,
+      `Warm or plate ${meal.ingredients[1] || 'complex carbs'} alongside sautéed ${meal.ingredients[2] || 'greens and vegetables'}.`,
+      `Combine in meal prep bowl. Portion is tailored for clean digestion and sustained midday physical output.`,
+    ];
     return {
       prepTime: '10 Mins',
       cookTime: '15 Mins',
       difficulty: 'Medium (15-20 mins)',
-      steps: [
-        `Preheat skillet or grill pan with light avocado or olive oil over medium-high heat.`,
-        `Season ${meal.ingredients[0]} with sea salt, black pepper, and garlic powder; sear until golden brown and cooked thoroughly.`,
-        `Warm or plate ${meal.ingredients[1] || 'complex carbs'} alongside sautéed ${meal.ingredients[2] || 'greens and vegetables'}.`,
-        `Combine in meal prep bowl. Portion is tailored for clean digestion and sustained midday physical output.`,
-      ],
+      steps,
+      instructions: steps,
       chefTip: 'Batch cook grains (brown rice, quinoa) for 3 days in advance to make weekday lunches effortlessly fast.',
     };
   } else if (meal.category === 'snack') {
+    const steps = [
+      `In a shaker cup or bowl, blend ${meal.ingredients.slice(0, 2).join(' and ')}.`,
+      `Add remaining toppings: ${meal.ingredients.slice(2).join(', ') || 'a pinch of Himalayan pink salt'}.`,
+      `Consume 45-60 minutes before training for explosive glycogen, or right after your workout for instant recovery.`,
+    ];
     return {
       prepTime: '3-5 Mins',
       cookTime: '0-5 Mins',
       difficulty: 'Quick (Under 10 mins)',
-      steps: [
-        `In a shaker cup or bowl, blend ${meal.ingredients.slice(0, 2).join(' and ')}.`,
-        `Add remaining toppings: ${meal.ingredients.slice(2).join(', ') || 'a pinch of Himalayan pink salt'}.`,
-        `Consume 45-60 minutes before training for explosive glycogen, or right after your workout for instant recovery.`,
-      ],
+      steps,
+      instructions: steps,
       chefTip: 'Consume with cold water to enhance rapid amino acid absorption into exhausted muscle tissue.',
     };
   } else {
+    const steps = [
+      `Sear or grill ${meal.ingredients[0]} with warming spices (cumin, paprika, turmeric) on medium flame.`,
+      `Steam or roast ${meal.ingredients[1] || 'healthy greens'} until fork-tender to preserve micronutrients.`,
+      `Serve alongside ${meal.ingredients[2] || 'slow-digesting complex carbs'}. Consume at least 2 hours before bed for optimal deep sleep.`,
+    ];
     return {
       prepTime: '10 Mins',
       cookTime: '15-20 Mins',
       difficulty: 'Medium (15-20 mins)',
-      steps: [
-        `Sear or grill ${meal.ingredients[0]} with warming spices (cumin, paprika, turmeric) on medium flame.`,
-        `Steam or roast ${meal.ingredients[1] || 'healthy greens'} until fork-tender to preserve micronutrients.`,
-        `Serve alongside ${meal.ingredients[2] || 'slow-digesting complex carbs'}. Consume at least 2 hours before bed for optimal deep sleep.`,
-      ],
+      steps,
+      instructions: steps,
       chefTip: 'A moderate-fat, high-protein dinner supports steady overnight muscle recovery and cellular repair.',
     };
   }

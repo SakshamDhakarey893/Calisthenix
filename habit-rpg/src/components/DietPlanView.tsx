@@ -909,7 +909,7 @@ export function DietPlanView({ onRewardXP, nutritionManager }: Props) {
               <div className="recipe-section">
                 <h4>Step-by-Step Culinary Preparation</h4>
                 <ol className="recipe-steps-list">
-                  {guide.instructions.map((step, idx) => (
+                  {(guide.steps || []).map((step, idx) => (
                     <li key={idx} className="recipe-step-item">
                       <span className="step-idx">{idx + 1}</span>
                       <span className="step-desc">{step}</span>

@@ -839,7 +839,7 @@ export function DietPlanView({ onRewardXP, nutritionManager }: Props) {
         };
 
         return (
-          <div className="modal-overlay" onClick={() => setSelectedRecipe(null)}>
+          <div className="modal-overlay recipe-modal-overlay" onClick={() => setSelectedRecipe(null)}>
             <div
               className="modal recipe-prep-modal"
               onClick={(e) => e.stopPropagation()}

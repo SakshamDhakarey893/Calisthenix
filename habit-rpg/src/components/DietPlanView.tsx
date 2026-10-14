@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import type {
   FitnessGoal,
   MealCategory,
@@ -37,6 +37,7 @@ export function DietPlanView({ onRewardXP, nutritionManager }: Props) {
   const [showMacroSettings, setShowMacroSettings] = useState(false);
   const [selectedRecipe, setSelectedRecipe] = useState<MealItem | null>(null);
   const [checkedIngredients, setCheckedIngredients] = useState<Record<string, boolean>>({});
+  const [completedSteps, setCompletedSteps] = useState<Record<number, boolean>>({});
   const [copyToast, setCopyToast] = useState(false);
 
   // Meal swap & search state
@@ -147,16 +148,33 @@ export function DietPlanView({ onRewardXP, nutritionManager }: Props) {
     });
   }, [swappingCategory, mealSearchQuery, nutrition.dietPreference]);
 
-  // Quick recipe switcher in recipe modal
+  // Quick recipe switcher in recipe modal: searches by name or ingredient with preference boost
   const recipeModalMatches = useMemo(() => {
     const q = recipeModalQuery.trim().toLowerCase();
     if (!q) return [];
-    return MEAL_POOL.filter(
+    const matched = MEAL_POOL.filter(
       (m) =>
-        m.dietType === nutrition.dietPreference &&
-        (m.name.toLowerCase().includes(q) || m.ingredients.some((i) => i.toLowerCase().includes(q)))
+        m.name.toLowerCase().includes(q) ||
+        m.ingredients.some((i) => i.toLowerCase().includes(q))
     );
+    // Sort preferred diet types first
+    return matched.sort((a, b) => {
+      if (a.dietType === nutrition.dietPreference && b.dietType !== nutrition.dietPreference) return -1;
+      if (b.dietType === nutrition.dietPreference && a.dietType !== nutrition.dietPreference) return 1;
+      return 0;
+    });
   }, [recipeModalQuery, nutrition.dietPreference]);
+
+  // Keyboard shortcut: close recipe modal on Escape
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && selectedRecipe) {
+        setSelectedRecipe(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedRecipe]);
 
   return (
     <div className="diet-nutrition-view">
@@ -514,6 +532,7 @@ export function DietPlanView({ onRewardXP, nutritionManager }: Props) {
                     onClick={() => {
                       setSelectedRecipe(item);
                       setCheckedIngredients({});
+                      setCompletedSteps({});
                       setRecipeModalQuery('');
                     }}
                     title="View cooking guide & copy grocery list"
@@ -775,47 +794,123 @@ export function DietPlanView({ onRewardXP, nutritionManager }: Props) {
         </div>
       )}
 
-      {/* Athletic Chef Recipe & Prep Modal with Recipe Search Filter */}
+      {/* Athletic Chef Recipe & Prep Modal with 2-Column Responsive Layout */}
       {selectedRecipe && (() => {
         const guide = getMealRecipeGuide(selectedRecipe);
         const isRecipeEaten = nutrition.eatenMealIds.includes(selectedRecipe.id);
+        const totalIngredients = selectedRecipe.ingredients.length;
+        const checkedCount = selectedRecipe.ingredients.filter((i) => checkedIngredients[i]).length;
+        const allIngredientsChecked = totalIngredients > 0 && checkedCount === totalIngredients;
+
+        const totalSteps = (guide.steps || []).length;
+        const completedStepsCount = Object.values(completedSteps).filter(Boolean).length;
+
+        // Macro ratio calculations
+        const pCal = selectedRecipe.macros.protein * 4;
+        const cCal = selectedRecipe.macros.carbs * 4;
+        const fCal = selectedRecipe.macros.fat * 9;
+        const totalMacroCal = Math.max(1, pCal + cCal + fCal);
+        const pPct = Math.round((pCal / totalMacroCal) * 100);
+        const cPct = Math.round((cCal / totalMacroCal) * 100);
+        const fPct = Math.max(0, 100 - pPct - cPct);
+
+        const categoryMeta: Record<MealCategory, { label: string; icon: string }> = {
+          breakfast: { label: 'Breakfast • Morning Readiness', icon: '🌅' },
+          lunch: { label: 'Lunch • Midday Sustenance', icon: '☀️' },
+          snack: { label: 'Snack • Anabolic Fuel', icon: '⚡' },
+          dinner: { label: 'Dinner • Deep Recovery', icon: '🌙' },
+        };
+
+        const currentCatMeta = categoryMeta[selectedRecipe.category] || {
+          label: selectedRecipe.category.toUpperCase(),
+          icon: '🍽️',
+        };
+
+        const toggleAllIngredients = () => {
+          if (allIngredientsChecked) {
+            setCheckedIngredients({});
+          } else {
+            const next: Record<string, boolean> = {};
+            selectedRecipe.ingredients.forEach((ing) => {
+              next[ing] = true;
+            });
+            setCheckedIngredients(next);
+          }
+        };
 
         return (
           <div className="modal-overlay" onClick={() => setSelectedRecipe(null)}>
-            <div className="modal recipe-prep-modal" onClick={(e) => e.stopPropagation()}>
-              <div className="modal-header-row">
+            <div
+              className="modal recipe-prep-modal"
+              onClick={(e) => e.stopPropagation()}
+              role="dialog"
+              aria-modal="true"
+              aria-label={`Recipe & Prep: ${selectedRecipe.name}`}
+            >
+              {/* Modal Top Header */}
+              <div className="recipe-modal-header">
                 <div className="recipe-modal-heading">
-                  <span className="recipe-tag">ATHLETIC CHEF GUIDE • {selectedRecipe.category.toUpperCase()}</span>
+                  <div className="recipe-tag-row">
+                    <span className="recipe-cat-tag">
+                      {currentCatMeta.icon} {currentCatMeta.label}
+                    </span>
+                    <span className={`recipe-diet-pill ${selectedRecipe.dietType}`}>
+                      {selectedRecipe.dietType === 'veg' ? '🌱 Vegetarian' : '🥩 Non-Veg'}
+                    </span>
+                    {isRecipeEaten && (
+                      <span className="recipe-eaten-pill">
+                        ✓ Eaten Today
+                      </span>
+                    )}
+                  </div>
                   <h3 className="recipe-title">{selectedRecipe.name}</h3>
+                  <p className="recipe-lead-desc">{selectedRecipe.description}</p>
                 </div>
+
                 <button
                   type="button"
-                  className="delete-btn"
+                  className="recipe-modal-close-btn"
                   onClick={() => setSelectedRecipe(null)}
                   aria-label="Close recipe modal"
+                  title="Close (Esc)"
                 >
                   ✕
                 </button>
               </div>
 
               {copyToast && (
-                <div className="recipe-toast-alert">
-                  ✅ Grocery checklist copied to clipboard!
+                <div className="recipe-toast-alert" role="status">
+                  <span className="toast-icon">📋</span>
+                  <span><strong>Checklist Copied!</strong> Grocery items &amp; macros are ready to paste.</span>
                 </div>
               )}
 
-              {/* Recipe Search & Switcher */}
+              {/* Instant Recipe Switcher / Search Bar */}
               <div className="recipe-search-quick">
-                <input
-                  type="text"
-                  placeholder='🔍 Switch recipe or search (e.g. "eggs", "chicken", "paneer", "oats")...'
-                  value={recipeModalQuery}
-                  onChange={(e) => setRecipeModalQuery(e.target.value)}
-                  className="recipe-switch-input"
-                />
+                <div className="recipe-search-input-wrap">
+                  <span className="search-prefix-icon">🔍</span>
+                  <input
+                    type="text"
+                    placeholder='Switch recipe or search (e.g. "eggs", "chicken", "paneer", "oats")...'
+                    value={recipeModalQuery}
+                    onChange={(e) => setRecipeModalQuery(e.target.value)}
+                    className="recipe-switch-input"
+                  />
+                  {recipeModalQuery && (
+                    <button
+                      type="button"
+                      className="search-clear-btn"
+                      onClick={() => setRecipeModalQuery('')}
+                      aria-label="Clear search"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+
                 {recipeModalMatches.length > 0 && (
                   <div className="recipe-quick-results">
-                    {recipeModalMatches.slice(0, 5).map((m) => (
+                    {recipeModalMatches.slice(0, 6).map((m) => (
                       <button
                         key={m.id}
                         type="button"
@@ -824,117 +919,267 @@ export function DietPlanView({ onRewardXP, nutritionManager }: Props) {
                           setSelectedRecipe(m);
                           setRecipeModalQuery('');
                           setCheckedIngredients({});
+                          setCompletedSteps({});
                         }}
                       >
-                        {m.name} ({m.macros.protein}g Pro)
+                        <span className="chip-name">{m.name}</span>
+                        <span className="chip-pro">{m.macros.protein}g Pro</span>
+                        <span className="chip-cal">{m.macros.calories} kcal</span>
                       </button>
                     ))}
                   </div>
                 )}
               </div>
 
-              {/* Recipe Meta Badges */}
-              <div className="recipe-meta-row">
-                <span className="recipe-meta-chip">⏱️ Prep: {guide.prepTime}</span>
-                <span className="recipe-meta-chip">🔥 Cook: {guide.cookTime}</span>
-                <span className="recipe-meta-chip">⚡ {guide.difficulty}</span>
-                <span className="recipe-meta-chip">🍽️ {selectedRecipe.portion}</span>
-              </div>
+              {/* 2-Column Responsive Body */}
+              <div className="recipe-layout-grid">
+                {/* Left Column: Nutrition Profile & Chef Secrets */}
+                <aside className="recipe-left-col">
+                  {/* Preparation Attributes Grid */}
+                  <div className="recipe-prep-meta-grid">
+                    <div className="meta-card">
+                      <span className="meta-icon">⏱️</span>
+                      <div className="meta-body">
+                        <span className="meta-val">{guide.prepTime}</span>
+                        <span className="meta-label">Prep Time</span>
+                      </div>
+                    </div>
+                    <div className="meta-card">
+                      <span className="meta-icon">🔥</span>
+                      <div className="meta-body">
+                        <span className="meta-val">{guide.cookTime}</span>
+                        <span className="meta-label">Cook Time</span>
+                      </div>
+                    </div>
+                    <div className="meta-card">
+                      <span className="meta-icon">⚡</span>
+                      <div className="meta-body">
+                        <span className="meta-val">{guide.difficulty}</span>
+                        <span className="meta-label">Difficulty</span>
+                      </div>
+                    </div>
+                    <div className="meta-card">
+                      <span className="meta-icon">🍽️</span>
+                      <div className="meta-body">
+                        <span className="meta-val">{selectedRecipe.portion}</span>
+                        <span className="meta-label">Portion Size</span>
+                      </div>
+                    </div>
+                  </div>
 
-              {/* Macros Breakdown */}
-              <div className="recipe-macros-bar">
-                <div className="macro-stat-box">
-                  <span className="box-val">{selectedRecipe.macros.calories}</span>
-                  <span className="box-label">Calories</span>
-                </div>
-                <div className="macro-stat-box highlight-pro">
-                  <span className="box-val">{selectedRecipe.macros.protein}g</span>
-                  <span className="box-label">Protein</span>
-                </div>
-                <div className="macro-stat-box">
-                  <span className="box-val">{selectedRecipe.macros.carbs}g</span>
-                  <span className="box-label">Carbs</span>
-                </div>
-                <div className="macro-stat-box">
-                  <span className="box-val">{selectedRecipe.macros.fat}g</span>
-                  <span className="box-label">Fats</span>
-                </div>
-              </div>
+                  {/* Macro Architecture Card */}
+                  <div className="recipe-macro-card">
+                    <div className="macro-card-header">
+                      <div className="macro-cal-badge">
+                        <span className="cal-fire">🔥</span>
+                        <span className="cal-val">{selectedRecipe.macros.calories}</span>
+                        <span className="cal-unit">kcal</span>
+                      </div>
+                      <span className="macro-tagline">Athletic Target</span>
+                    </div>
 
-              {/* Chef Athletic Insight */}
-              <div className="chef-tip-banner">
-                <span className="chef-icon">👨‍🍳</span>
-                <p>
-                  <strong>Athletic Chef Secret:</strong> {guide.chefTip}
-                </p>
-              </div>
+                    <div className="macro-pillars-row">
+                      <div className="macro-pillar pro">
+                        <span className="pillar-num">{selectedRecipe.macros.protein}g</span>
+                        <span className="pillar-name">Protein</span>
+                        <span className="pillar-pct">{pPct}%</span>
+                      </div>
+                      <div className="macro-pillar carb">
+                        <span className="pillar-num">{selectedRecipe.macros.carbs}g</span>
+                        <span className="pillar-name">Carbs</span>
+                        <span className="pillar-pct">{cPct}%</span>
+                      </div>
+                      <div className="macro-pillar fat">
+                        <span className="pillar-num">{selectedRecipe.macros.fat}g</span>
+                        <span className="pillar-name">Fats</span>
+                        <span className="pillar-pct">{fPct}%</span>
+                      </div>
+                    </div>
 
-              {/* Ingredients Checklist */}
-              <div className="recipe-section">
-                <div className="recipe-section-title-row">
-                  <h4>Ingredients Checklist</h4>
-                  <button
-                    type="button"
-                    className="copy-grocery-btn"
-                    onClick={() => handleCopyGroceryList(selectedRecipe)}
-                    title="Copy grocery checklist with macros"
-                  >
-                    📋 Copy Grocery List
-                  </button>
-                </div>
-                <p className="recipe-subhint">Tap ingredients as you shop or prep your kitchen:</p>
-                <div className="ingredients-checklist">
-                  {selectedRecipe.ingredients.map((ing) => {
-                    const isChecked = !!checkedIngredients[ing];
-                    return (
-                      <label key={ing} className={`check-item ${isChecked ? 'checked' : ''}`}>
-                        <input
-                          type="checkbox"
-                          checked={isChecked}
-                          onChange={() =>
-                            setCheckedIngredients((prev) => ({
-                              ...prev,
-                              [ing]: !prev[ing],
-                            }))
-                          }
-                        />
-                        <span className="check-text">{ing}</span>
-                      </label>
-                    );
-                  })}
-                </div>
-              </div>
+                    {/* Segmented Macro Bar */}
+                    <div className="macro-ratio-bar" title={`Protein: ${pPct}% | Carbs: ${cPct}% | Fats: ${fPct}%`}>
+                      <div className="ratio-seg seg-pro" style={{ width: `${pPct}%` }} />
+                      <div className="ratio-seg seg-carb" style={{ width: `${cPct}%` }} />
+                      <div className="ratio-seg seg-fat" style={{ width: `${fPct}%` }} />
+                    </div>
+                    <div className="macro-ratio-legend">
+                      <span className="legend-item pro"><span className="dot" /> Protein</span>
+                      <span className="legend-item carb"><span className="dot" /> Carbs</span>
+                      <span className="legend-item fat"><span className="dot" /> Fats</span>
+                    </div>
+                  </div>
 
-              {/* Step-by-Step Instructions */}
-              <div className="recipe-section">
-                <h4>Step-by-Step Culinary Preparation</h4>
-                <ol className="recipe-steps-list">
-                  {(guide.steps || []).map((step, idx) => (
-                    <li key={idx} className="recipe-step-item">
-                      <span className="step-idx">{idx + 1}</span>
-                      <span className="step-desc">{step}</span>
-                    </li>
-                  ))}
-                </ol>
+                  {/* Athletic Chef Tip */}
+                  <div className="chef-tip-card">
+                    <div className="chef-tip-top">
+                      <span className="chef-badge-icon">👨‍🍳</span>
+                      <span className="chef-badge-text">ATHLETIC CHEF SECRET</span>
+                    </div>
+                    <p className="chef-tip-quote">"{guide.chefTip}"</p>
+                  </div>
+                </aside>
+
+                {/* Right Column: Ingredients & Steps */}
+                <main className="recipe-right-col">
+                  {/* Ingredients Checklist */}
+                  <section className="recipe-section ingredients-section">
+                    <div className="recipe-section-title-row">
+                      <div className="section-title-wrap">
+                        <h4>🛒 Ingredients Checklist</h4>
+                        <span className={`prep-progress-badge ${allIngredientsChecked ? 'all-done' : ''}`}>
+                          {checkedCount}/{totalIngredients} Ready
+                        </span>
+                      </div>
+
+                      <div className="section-actions-wrap">
+                        <button
+                          type="button"
+                          className="btn-tiny-action"
+                          onClick={toggleAllIngredients}
+                        >
+                          {allIngredientsChecked ? 'Uncheck All' : 'Check All'}
+                        </button>
+                        <button
+                          type="button"
+                          className="copy-grocery-btn"
+                          onClick={() => handleCopyGroceryList(selectedRecipe)}
+                          title="Copy grocery checklist with macros"
+                        >
+                          📋 Copy List
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Progress track */}
+                    <div className="prep-progress-track">
+                      <div
+                        className="prep-progress-fill"
+                        style={{ width: `${totalIngredients > 0 ? (checkedCount / totalIngredients) * 100 : 0}%` }}
+                      />
+                    </div>
+
+                    <p className="recipe-subhint">
+                      Tap any ingredient as you shop or prep in the kitchen:
+                    </p>
+
+                    <div className="recipe-checklist">
+                      {selectedRecipe.ingredients.map((ing) => {
+                        const isChecked = !!checkedIngredients[ing];
+                        return (
+                          <div
+                            key={ing}
+                            className={`recipe-check-card ${isChecked ? 'checked' : ''}`}
+                            onClick={() =>
+                              setCheckedIngredients((prev) => ({
+                                ...prev,
+                                [ing]: !prev[ing],
+                              }))
+                            }
+                            role="checkbox"
+                            aria-checked={isChecked}
+                            tabIndex={0}
+                            onKeyDown={(e) => {
+                              if (e.key === ' ' || e.key === 'Enter') {
+                                e.preventDefault();
+                                setCheckedIngredients((prev) => ({
+                                  ...prev,
+                                  [ing]: !prev[ing],
+                                }));
+                              }
+                            }}
+                          >
+                            <span className={`custom-checkbox ${isChecked ? 'active' : ''}`}>
+                              {isChecked ? '✓' : ''}
+                            </span>
+                            <span className="ingredient-name">{ing}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </section>
+
+                  {/* Culinary Preparation Steps */}
+                  <section className="recipe-section steps-section">
+                    <div className="recipe-section-title-row">
+                      <div className="section-title-wrap">
+                        <h4>👨‍🍳 Culinary Preparation Guide</h4>
+                        <span className="prep-progress-badge steps">
+                          {completedStepsCount}/{totalSteps} Steps
+                        </span>
+                      </div>
+                    </div>
+
+                    <p className="recipe-subhint">
+                      Follow along and tap any step to track your cooking progress:
+                    </p>
+
+                    <div className="recipe-steps-container">
+                      {(guide.steps || []).map((step, idx) => {
+                        const isStepDone = !!completedSteps[idx];
+                        return (
+                          <div
+                            key={idx}
+                            className={`recipe-step-card ${isStepDone ? 'completed' : ''}`}
+                            onClick={() =>
+                              setCompletedSteps((prev) => ({
+                                ...prev,
+                                [idx]: !prev[idx],
+                              }))
+                            }
+                            role="button"
+                            tabIndex={0}
+                            onKeyDown={(e) => {
+                              if (e.key === ' ' || e.key === 'Enter') {
+                                e.preventDefault();
+                                setCompletedSteps((prev) => ({
+                                  ...prev,
+                                  [idx]: !prev[idx],
+                                }));
+                              }
+                            }}
+                            title="Click to toggle step completion"
+                          >
+                            <div className="step-badge-col">
+                              <span className={`step-badge ${isStepDone ? 'done' : ''}`}>
+                                {isStepDone ? '✓' : String(idx + 1).padStart(2, '0')}
+                              </span>
+                            </div>
+                            <div className="step-content">
+                              <span className="step-tagline">Phase {idx + 1}</span>
+                              <p className="step-text">{step}</p>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </section>
+                </main>
               </div>
 
               {/* Modal Footer Actions */}
               <div className="recipe-modal-footer">
-                <button
-                  type="button"
-                  className="btn-secondary"
-                  onClick={() => setSelectedRecipe(null)}
-                >
-                  Close Recipe
-                </button>
+                <div className="recipe-footer-summary">
+                  <span className="summary-portion">🍽️ {selectedRecipe.portion}</span>
+                  <span className="summary-cal">🔥 {selectedRecipe.macros.calories} kcal</span>
+                </div>
 
-                <button
-                  type="button"
-                  className={`eat-meal-btn ${isRecipeEaten ? 'eaten' : ''}`}
-                  onClick={() => toggleEatPlanMeal(selectedRecipe)}
-                >
-                  {isRecipeEaten ? '✓ Marked As Eaten — Undo' : '🍴 Mark As Eaten Today'}
-                </button>
+                <div className="recipe-footer-btns">
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    onClick={() => setSelectedRecipe(null)}
+                  >
+                    Close Recipe
+                  </button>
+
+                  <button
+                    type="button"
+                    className={`eat-meal-btn ${isRecipeEaten ? 'eaten' : ''}`}
+                    onClick={() => toggleEatPlanMeal(selectedRecipe)}
+                  >
+                    {isRecipeEaten ? '✓ Marked As Eaten — Undo' : '🍴 Mark As Eaten Today'}
+                  </button>
+                </div>
               </div>
             </div>
           </div>

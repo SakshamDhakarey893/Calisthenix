@@ -389,7 +389,10 @@ export function Analytics({ quests, player }: Props) {
         <div className="heatmap-main-layout">
           {/* Left / Main View: Matrix & Inspector */}
           <div className="heatmap-matrix-area">
-            {/* Scrollable Container (overflow-y hidden, scrollbar completely removed) */}
+            <div className="heatmap-mobile-swipe-hint">
+              <span>👉 Swipe to view 10-week history</span>
+            </div>
+            {/* Scrollable Container with touch momentum */}
             <div className="heatmap-scroll-area">
               <div className="heatmap-grid-flex">
                 {/* Day of Week Column */}

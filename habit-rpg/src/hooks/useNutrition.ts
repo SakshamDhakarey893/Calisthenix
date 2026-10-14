@@ -188,6 +188,21 @@ export function useNutrition(onRewardXP?: (xp: number, reason: string) => void) 
     });
   }, []);
 
+  const selectPlanMeal = useCallback((category: MealCategory, meal: MealItem) => {
+    setState((prev) => {
+      const currentMeal = prev.activePlan[category];
+      const newEaten = prev.eatenMealIds.filter((id) => id !== currentMeal?.id);
+      return {
+        ...prev,
+        activePlan: {
+          ...prev.activePlan,
+          [category]: meal,
+        },
+        eatenMealIds: newEaten,
+      };
+    });
+  }, []);
+
   const rollNewDailyPlan = useCallback(() => {
     setState((prev) => ({
       ...prev,
@@ -262,6 +277,7 @@ export function useNutrition(onRewardXP?: (xp: number, reason: string) => void) 
     setTargetMacros,
     toggleEatPlanMeal,
     shufflePlanMeal,
+    selectPlanMeal,
     rollNewDailyPlan,
     logCustomFood,
     deleteCustomFood,

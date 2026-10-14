@@ -1,11 +1,11 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import type {
   FitnessGoal,
   MealCategory,
   MealItem,
 } from '../types';
 import { useNutrition } from '../hooks/useNutrition';
-import { getMealRecipeGuide } from '../data/mealPool';
+import { getMealRecipeGuide, MEAL_POOL } from '../data/mealPool';
 
 interface Props {
   onRewardXP?: (xp: number, reason: string) => void;
@@ -24,6 +24,7 @@ export function DietPlanView({ onRewardXP, nutritionManager }: Props) {
     setTargetMacros,
     toggleEatPlanMeal,
     shufflePlanMeal,
+    selectPlanMeal,
     rollNewDailyPlan,
     logCustomFood,
     deleteCustomFood,
@@ -37,6 +38,15 @@ export function DietPlanView({ onRewardXP, nutritionManager }: Props) {
   const [selectedRecipe, setSelectedRecipe] = useState<MealItem | null>(null);
   const [checkedIngredients, setCheckedIngredients] = useState<Record<string, boolean>>({});
   const [copyToast, setCopyToast] = useState(false);
+
+  // Meal swap & search state
+  const [swappingCategory, setSwappingCategory] = useState<MealCategory | null>(null);
+  const [mealSearchQuery, setMealSearchQuery] = useState('');
+  const [recipeModalQuery, setRecipeModalQuery] = useState('');
+
+  // Water ripple effect state
+  const [waterRippleAmount, setWaterRippleAmount] = useState<number | null>(null);
+  const [showWaterRipple, setShowWaterRipple] = useState(false);
 
   // Custom food form state
   const [customName, setCustomName] = useState('');
@@ -82,10 +92,17 @@ export function DietPlanView({ onRewardXP, nutritionManager }: Props) {
     setShowMacroSettings(false);
   };
 
+  const handleAddWaterWithRipple = (amount: number) => {
+    addWater(amount);
+    setWaterRippleAmount(amount);
+    setShowWaterRipple(true);
+    setTimeout(() => setShowWaterRipple(false), 1200);
+  };
+
   const handleCopyGroceryList = (meal: MealItem) => {
     const guide = getMealRecipeGuide(meal);
     const text = [
-      `🛒 Calisthenics Nutrition - ${meal.name}`,
+      `🛒 Calisthenix Nutrition - ${meal.name}`,
       `Portion: ${meal.portion}`,
       `Category: ${meal.category.toUpperCase()} (${meal.dietType.toUpperCase()})`,
       `Macros: ${meal.macros.calories} kcal | ${meal.macros.protein}g Protein | ${meal.macros.carbs}g Carbs | ${meal.macros.fat}g Fat`,
@@ -114,6 +131,32 @@ export function DietPlanView({ onRewardXP, nutritionManager }: Props) {
   const fatPercent = Math.min(100, Math.round((consumedMacros.fat / (nutrition.targetMacros.fat || 1)) * 100));
 
   const waterPercent = Math.min(100, Math.round((nutrition.consumedWaterMl / (nutrition.targetWaterMl || 1)) * 100));
+
+  // Filtered swap meals by diet preference and keyword (name or ingredients)
+  const availableSwapMeals = useMemo(() => {
+    if (!swappingCategory) return [];
+    const query = mealSearchQuery.trim().toLowerCase();
+    return MEAL_POOL.filter((meal) => {
+      const matchesDiet = meal.dietType === nutrition.dietPreference;
+      const matchesCategory = meal.category === swappingCategory;
+      if (!matchesDiet || !matchesCategory) return false;
+      if (!query) return true;
+      const matchesName = meal.name.toLowerCase().includes(query);
+      const matchesIng = meal.ingredients.some((ing) => ing.toLowerCase().includes(query));
+      return matchesName || matchesIng;
+    });
+  }, [swappingCategory, mealSearchQuery, nutrition.dietPreference]);
+
+  // Quick recipe switcher in recipe modal
+  const recipeModalMatches = useMemo(() => {
+    const q = recipeModalQuery.trim().toLowerCase();
+    if (!q) return [];
+    return MEAL_POOL.filter(
+      (m) =>
+        m.dietType === nutrition.dietPreference &&
+        (m.name.toLowerCase().includes(q) || m.ingredients.some((i) => i.toLowerCase().includes(q)))
+    );
+  }, [recipeModalQuery, nutrition.dietPreference]);
 
   return (
     <div className="diet-nutrition-view">
@@ -244,10 +287,10 @@ export function DietPlanView({ onRewardXP, nutritionManager }: Props) {
         )}
       </section>
 
-      {/* Live Macro Gauges Dashboard */}
+      {/* Live Macro Gauges Dashboard with Goal Celebration Pulses */}
       <section className="macro-dashboard-grid">
         {/* Calories Card */}
-        <div className="macro-card calories-card">
+        <div className={`macro-card calories-card ${calPercent >= 100 ? 'goal-celebrate' : ''}`}>
           <div className="macro-card-header">
             <span className="macro-icon">🔥</span>
             <span className="macro-title">Calories</span>
@@ -261,12 +304,14 @@ export function DietPlanView({ onRewardXP, nutritionManager }: Props) {
             <div className="macro-progress-fill cal-fill" style={{ width: `${calPercent}%` }} />
           </div>
           <span className="macro-remaining">
-            {Math.max(0, nutrition.targetMacros.calories - consumedMacros.calories)} kcal remaining
+            {calPercent >= 100
+              ? '✨ Daily Energy Target Met!'
+              : `${Math.max(0, nutrition.targetMacros.calories - consumedMacros.calories)} kcal remaining`}
           </span>
         </div>
 
-        {/* Protein Card (Hero Priority) */}
-        <div className="macro-card protein-card highlight">
+        {/* Protein Card (Hero Priority with Celebration Glow) */}
+        <div className={`macro-card protein-card highlight ${proteinPercent >= 100 ? 'goal-celebrate' : ''}`}>
           <div className="macro-card-header">
             <span className="macro-icon">🥩</span>
             <span className="macro-title">Protein (Hero Stat)</span>
@@ -280,12 +325,14 @@ export function DietPlanView({ onRewardXP, nutritionManager }: Props) {
             <div className="macro-progress-fill pro-fill" style={{ width: `${proteinPercent}%` }} />
           </div>
           <div className="macro-bonus-badge">
-            {proteinPercent >= 100 ? '⭐ Goal Reached (+50 XP Claimed!)' : `${nutrition.targetMacros.protein - consumedMacros.protein}g needed for +50 XP bonus`}
+            {proteinPercent >= 100
+              ? '👑 PROTEIN TARGET CONQUERED! (+50 XP Claimed)'
+              : `${nutrition.targetMacros.protein - consumedMacros.protein}g needed for +50 XP bonus`}
           </div>
         </div>
 
         {/* Carbs Card */}
-        <div className="macro-card carbs-card">
+        <div className={`macro-card carbs-card ${carbPercent >= 100 ? 'goal-celebrate' : ''}`}>
           <div className="macro-card-header">
             <span className="macro-icon">🍚</span>
             <span className="macro-title">Carbohydrates</span>
@@ -299,12 +346,12 @@ export function DietPlanView({ onRewardXP, nutritionManager }: Props) {
             <div className="macro-progress-fill carb-fill" style={{ width: `${carbPercent}%` }} />
           </div>
           <span className="macro-remaining">
-            {Math.max(0, nutrition.targetMacros.carbs - consumedMacros.carbs)}g remaining
+            {carbPercent >= 100 ? '⚡ Glycogen Stores Replenished' : `${Math.max(0, nutrition.targetMacros.carbs - consumedMacros.carbs)}g remaining`}
           </span>
         </div>
 
         {/* Fat Card */}
-        <div className="macro-card fat-card">
+        <div className={`macro-card fat-card ${fatPercent >= 100 ? 'goal-celebrate' : ''}`}>
           <div className="macro-card-header">
             <span className="macro-icon">🥑</span>
             <span className="macro-title">Fats</span>
@@ -318,13 +365,19 @@ export function DietPlanView({ onRewardXP, nutritionManager }: Props) {
             <div className="macro-progress-fill fat-fill" style={{ width: `${fatPercent}%` }} />
           </div>
           <span className="macro-remaining">
-            {Math.max(0, nutrition.targetMacros.fat - consumedMacros.fat)}g remaining
+            {fatPercent >= 100 ? '🛡️ Hormone Health Optimized' : `${Math.max(0, nutrition.targetMacros.fat - consumedMacros.fat)}g remaining`}
           </span>
         </div>
       </section>
 
-      {/* Hydration Tracker Station */}
-      <section className="hydration-station-card">
+      {/* Hydration Tracker Station with Fluid Wave Ripple & Goal Glow */}
+      <section className={`hydration-station-card ${waterPercent >= 100 ? 'goal-celebrate' : ''} ${showWaterRipple ? 'water-ripple-active' : ''}`}>
+        {showWaterRipple && (
+          <div className="water-floating-pop" aria-live="polite">
+            +{waterRippleAmount}ml 💧 Vitality Up!
+          </div>
+        )}
+
         <div className="hydration-info">
           <div className="hydration-header">
             <span className="water-drop-icon">💧</span>
@@ -343,17 +396,20 @@ export function DietPlanView({ onRewardXP, nutritionManager }: Props) {
         </div>
 
         <div className="hydration-progress-track">
-          <div className="hydration-progress-bar" style={{ width: `${waterPercent}%` }} />
+          <div
+            className={`hydration-progress-bar ${showWaterRipple ? 'bar-wave' : ''}`}
+            style={{ width: `${waterPercent}%` }}
+          />
         </div>
 
         <div className="hydration-actions">
-          <button type="button" className="btn-action water-btn" onClick={() => addWater(250)}>
+          <button type="button" className="btn-action water-btn" onClick={() => handleAddWaterWithRipple(250)}>
             +250 ml (Cup)
           </button>
-          <button type="button" className="btn-action water-btn" onClick={() => addWater(500)}>
+          <button type="button" className="btn-action water-btn" onClick={() => handleAddWaterWithRipple(500)}>
             +500 ml (Bottle)
           </button>
-          <button type="button" className="btn-action water-btn" onClick={() => addWater(1000)}>
+          <button type="button" className="btn-action water-btn" onClick={() => handleAddWaterWithRipple(1000)}>
             +1.0 L (Shaker)
           </button>
           <button type="button" className="btn-action water-reset-btn" onClick={resetWater} title="Reset today's water">
@@ -402,14 +458,27 @@ export function DietPlanView({ onRewardXP, nutritionManager }: Props) {
                   <span className="meal-cat-badge">
                     <span className="meal-cat-icon">{icon}</span> {label}
                   </span>
-                  <button
-                    type="button"
-                    className="shuffle-meal-btn"
-                    onClick={() => shufflePlanMeal(key)}
-                    title="Pick another meal option for this slot"
-                  >
-                    🔀
-                  </button>
+                  <div className="meal-card-top-actions">
+                    <button
+                      type="button"
+                      className="btn-search-swap-mini"
+                      onClick={() => {
+                        setSwappingCategory(key);
+                        setMealSearchQuery('');
+                      }}
+                      title="Search & swap this meal with another option"
+                    >
+                      🔍 Swap
+                    </button>
+                    <button
+                      type="button"
+                      className="shuffle-meal-btn"
+                      onClick={() => shufflePlanMeal(key)}
+                      title="Pick a random alternative for this slot"
+                    >
+                      🔀
+                    </button>
+                  </div>
                 </div>
 
                 <h4 className="meal-name">{item.name}</h4>
@@ -445,6 +514,7 @@ export function DietPlanView({ onRewardXP, nutritionManager }: Props) {
                     onClick={() => {
                       setSelectedRecipe(item);
                       setCheckedIngredients({});
+                      setRecipeModalQuery('');
                     }}
                     title="View cooking guide & copy grocery list"
                   >
@@ -502,6 +572,104 @@ export function DietPlanView({ onRewardXP, nutritionManager }: Props) {
             ))}
           </div>
         </section>
+      )}
+
+      {/* Meal Swap & Instant Keyword Search Modal */}
+      {swappingCategory && (
+        <div className="modal-overlay" onClick={() => setSwappingCategory(null)}>
+          <div className="modal meal-swap-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header-row">
+              <div>
+                <span className="recipe-tag">MEAL SELECTOR &amp; SEARCH</span>
+                <h3 className="modal-title">Swap {swappingCategory.toUpperCase()}</h3>
+              </div>
+              <button
+                type="button"
+                className="delete-btn"
+                onClick={() => setSwappingCategory(null)}
+                aria-label="Close"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="meal-search-bar-row">
+              <span className="search-icon">🔍</span>
+              <input
+                type="text"
+                className="meal-search-input"
+                value={mealSearchQuery}
+                onChange={(e) => setMealSearchQuery(e.target.value)}
+                placeholder='Search meals or ingredients (e.g. "eggs", "chicken", "paneer", "oats")...'
+                autoFocus
+              />
+              {mealSearchQuery && (
+                <button
+                  type="button"
+                  className="search-clear-btn"
+                  onClick={() => setMealSearchQuery('')}
+                  title="Clear search"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+
+            <div className="swap-meals-list">
+              {availableSwapMeals.length === 0 ? (
+                <div className="no-meals-found">
+                  <p>No {nutrition.dietPreference} {swappingCategory} options found matching "{mealSearchQuery}".</p>
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    onClick={() => setMealSearchQuery('')}
+                  >
+                    Clear Search
+                  </button>
+                </div>
+              ) : (
+                availableSwapMeals.map((meal) => {
+                  const isCurrent = nutrition.activePlan[swappingCategory]?.id === meal.id;
+                  return (
+                    <div
+                      key={meal.id}
+                      className={`swap-meal-item ${isCurrent ? 'is-active-meal' : ''}`}
+                    >
+                      <div className="swap-meal-info">
+                        <div className="swap-meal-top">
+                          <span className="swap-meal-name">{meal.name}</span>
+                          {isCurrent && <span className="active-pill">ACTIVE SELECTION</span>}
+                        </div>
+                        <span className="swap-meal-portion">Portion: {meal.portion}</span>
+                        <div className="swap-meal-macros">
+                          <span className="macro-tag cal">{meal.macros.calories} kcal</span>
+                          <span className="macro-tag pro">{meal.macros.protein}g Protein</span>
+                          <span className="macro-tag carb">{meal.macros.carbs}g Carbs</span>
+                          <span className="macro-tag fat">{meal.macros.fat}g Fat</span>
+                        </div>
+                        <div className="swap-meal-ings">
+                          <strong>Key Ingredients:</strong> {meal.ingredients.join(', ')}
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        className={`btn-select-meal ${isCurrent ? 'active' : ''}`}
+                        disabled={isCurrent}
+                        onClick={() => {
+                          selectPlanMeal(swappingCategory, meal);
+                          setSwappingCategory(null);
+                        }}
+                      >
+                        {isCurrent ? 'Current Selection' : 'Select This Meal'}
+                      </button>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Quick Custom Food Modal */}
@@ -607,7 +775,7 @@ export function DietPlanView({ onRewardXP, nutritionManager }: Props) {
         </div>
       )}
 
-      {/* Athletic Chef Recipe & Prep Modal */}
+      {/* Athletic Chef Recipe & Prep Modal with Recipe Search Filter */}
       {selectedRecipe && (() => {
         const guide = getMealRecipeGuide(selectedRecipe);
         const isRecipeEaten = nutrition.eatenMealIds.includes(selectedRecipe.id);
@@ -636,6 +804,35 @@ export function DietPlanView({ onRewardXP, nutritionManager }: Props) {
                 </div>
               )}
 
+              {/* Recipe Search & Switcher */}
+              <div className="recipe-search-quick">
+                <input
+                  type="text"
+                  placeholder='🔍 Switch recipe or search (e.g. "eggs", "chicken", "paneer", "oats")...'
+                  value={recipeModalQuery}
+                  onChange={(e) => setRecipeModalQuery(e.target.value)}
+                  className="recipe-switch-input"
+                />
+                {recipeModalMatches.length > 0 && (
+                  <div className="recipe-quick-results">
+                    {recipeModalMatches.slice(0, 5).map((m) => (
+                      <button
+                        key={m.id}
+                        type="button"
+                        className={`quick-recipe-chip ${selectedRecipe.id === m.id ? 'active' : ''}`}
+                        onClick={() => {
+                          setSelectedRecipe(m);
+                          setRecipeModalQuery('');
+                          setCheckedIngredients({});
+                        }}
+                      >
+                        {m.name} ({m.macros.protein}g Pro)
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               {/* Recipe Meta Badges */}
               <div className="recipe-meta-row">
                 <span className="recipe-meta-chip">⏱️ Prep: {guide.prepTime}</span>
@@ -660,80 +857,83 @@ export function DietPlanView({ onRewardXP, nutritionManager }: Props) {
                 </div>
                 <div className="macro-stat-box">
                   <span className="box-val">{selectedRecipe.macros.fat}g</span>
-                  <span className="box-label">Fat</span>
+                  <span className="box-label">Fats</span>
                 </div>
               </div>
 
-              {/* Ingredients Checklist with Copy Action */}
+              {/* Chef Athletic Insight */}
+              <div className="chef-tip-banner">
+                <span className="chef-icon">👨‍🍳</span>
+                <p>
+                  <strong>Athletic Chef Secret:</strong> {guide.chefTip}
+                </p>
+              </div>
+
+              {/* Ingredients Checklist */}
               <div className="recipe-section">
                 <div className="recipe-section-title-row">
-                  <h4>🛒 Ingredients Checklist</h4>
+                  <h4>Ingredients Checklist</h4>
                   <button
                     type="button"
                     className="copy-grocery-btn"
                     onClick={() => handleCopyGroceryList(selectedRecipe)}
+                    title="Copy grocery checklist with macros"
                   >
-                    📋 Copy Grocery Checklist
+                    📋 Copy Grocery List
                   </button>
                 </div>
-                <div className="recipe-ingredients-checklist">
+                <p className="recipe-subhint">Tap ingredients as you shop or prep your kitchen:</p>
+                <div className="ingredients-checklist">
                   {selectedRecipe.ingredients.map((ing) => {
                     const isChecked = !!checkedIngredients[ing];
                     return (
-                      <label key={ing} className={`ing-check-item ${isChecked ? 'checked' : ''}`}>
+                      <label key={ing} className={`check-item ${isChecked ? 'checked' : ''}`}>
                         <input
                           type="checkbox"
                           checked={isChecked}
-                          onChange={(e) =>
+                          onChange={() =>
                             setCheckedIngredients((prev) => ({
                               ...prev,
-                              [ing]: e.target.checked,
+                              [ing]: !prev[ing],
                             }))
                           }
                         />
-                        <span className="ing-check-text">{ing}</span>
+                        <span className="check-text">{ing}</span>
                       </label>
                     );
                   })}
                 </div>
               </div>
 
-              {/* Step-by-Step Cooking Guide */}
+              {/* Step-by-Step Instructions */}
               <div className="recipe-section">
-                <h4>👨‍🍳 Step-by-Step Preparation Guide</h4>
+                <h4>Step-by-Step Culinary Preparation</h4>
                 <ol className="recipe-steps-list">
-                  {guide.steps.map((step, idx) => (
+                  {guide.instructions.map((step, idx) => (
                     <li key={idx} className="recipe-step-item">
-                      <span className="step-num">Step {idx + 1}</span>
-                      <p className="step-text">{step}</p>
+                      <span className="step-idx">{idx + 1}</span>
+                      <span className="step-desc">{step}</span>
                     </li>
                   ))}
                 </ol>
               </div>
 
-              {/* Chef Performance Tip */}
-              <div className="chef-tip-card">
-                <span className="tip-icon">💡</span>
-                <div className="tip-content">
-                  <strong>Athletic Performance Tip:</strong>
-                  <p>{guide.chefTip}</p>
-                </div>
-              </div>
-
-              <div className="modal-actions recipe-footer-actions">
+              {/* Modal Footer Actions */}
+              <div className="recipe-modal-footer">
                 <button
                   type="button"
                   className="btn-secondary"
                   onClick={() => setSelectedRecipe(null)}
                 >
-                  Close
+                  Close Recipe
                 </button>
+
                 <button
                   type="button"
                   className={`eat-meal-btn ${isRecipeEaten ? 'eaten' : ''}`}
                   onClick={() => toggleEatPlanMeal(selectedRecipe)}
                 >
-                  {isRecipeEaten ? '✓ Eaten (Macros Tracked)' : '🍴 Mark As Eaten (+Macros)'}
+                  {isRecipeEaten ? '✓ Marked As Eaten — Undo' : '🍴 Mark As Eaten Today'}
                 </button>
               </div>
             </div>

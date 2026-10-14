@@ -1,0 +1,7 @@
+{
+  "buildCommand": "cd habit-rpg && npm install && npm run build",
+  "outputDirectory": "habit-rpg/dist",
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "name": "calisthenix-root",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "npm --prefix habit-rpg run dev",
+    "build": "npm --prefix habit-rpg run build",
+    "lint": "npm --prefix habit-rpg run lint",
+    "preview": "npm --prefix habit-rpg run preview"
+  }
+}

@@ -20,6 +20,7 @@ import {
 import type { Firestore } from 'firebase/firestore';
 import { getSavedFirebaseConfig } from './firebaseConfig';
 import type { FirebaseConfig } from './firebaseConfig';
+import { todayISO } from '../types';
 import type { AppData, NutritionState } from '../types';
 
 let appInstance: FirebaseApp | null = null;
@@ -181,7 +182,7 @@ export function exportBackupJSON(gameData: AppData, nutritionData: NutritionStat
   const url = URL.createObjectURL(blob);
 
   const a = document.createElement('a');
-  const dateStr = new Date().toISOString().slice(0, 10);
+  const dateStr = todayISO();
   a.href = url;
   a.download = `calisthenix-save-${dateStr}.json`;
   document.body.appendChild(a);

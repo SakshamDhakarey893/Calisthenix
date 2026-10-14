@@ -232,14 +232,25 @@ export function xpProgress(totalXP: number): { current: number; needed: number; 
   };
 }
 
+/**
+ * Formats a Date object to YYYY-MM-DD in the user's LOCAL timezone.
+ * Using toISOString().slice(0, 10) causes UTC date drift for timezones outside GMT (e.g. IST +5:30).
+ */
+export function toLocalDateISO(date: Date = new Date()): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 export function todayISO(): string {
-  return new Date().toISOString().slice(0, 10);
+  return toLocalDateISO(new Date());
 }
 
 export function yesterdayISO(): string {
   const d = new Date();
   d.setDate(d.getDate() - 1);
-  return d.toISOString().slice(0, 10);
+  return toLocalDateISO(d);
 }
 
 export interface DailyQuestTemplate {

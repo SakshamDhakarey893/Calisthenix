@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import type { Quest, PlayerStats } from '../types';
-import { DIFFICULTY_XP, todayISO } from '../types';
+import { DIFFICULTY_XP, todayISO, toLocalDateISO, yesterdayISO } from '../types';
 
 interface Props {
   quests: Quest[];
@@ -54,17 +54,23 @@ function calculateOverallStreak(quests: Quest[]): {
   }
 
   const today = todayISO();
-  const yesterday = new Date();
-  yesterday.setDate(yesterday.getDate() - 1);
-  const yesterdayStr = yesterday.toISOString().slice(0, 10);
+  const yesterdayStr = yesterdayISO();
 
   let currentStreak = 0;
-  const checkDate = allDates.has(today) ? new Date() : allDates.has(yesterdayStr) ? yesterday : null;
+  const checkDate = allDates.has(today)
+    ? new Date()
+    : allDates.has(yesterdayStr)
+    ? (() => {
+        const y = new Date();
+        y.setDate(y.getDate() - 1);
+        return y;
+      })()
+    : null;
 
   if (checkDate) {
     const curr = new Date(checkDate);
     while (true) {
-      const s = curr.toISOString().slice(0, 10);
+      const s = toLocalDateISO(curr);
       if (allDates.has(s)) {
         currentStreak++;
         curr.setDate(curr.getDate() - 1);
@@ -79,7 +85,8 @@ function calculateOverallStreak(quests: Quest[]): {
   let prevDate: Date | null = null;
 
   for (const dStr of sortedDates) {
-    const d = new Date(dStr + 'T00:00:00');
+    const [y, m, dNum] = dStr.split('-').map(Number);
+    const d = new Date(y, m - 1, dNum);
     if (!prevDate) {
       running = 1;
     } else {
@@ -172,11 +179,9 @@ function generateHeatmapDays(quests: Quest[], numWeeks = 10): HeatmapData {
     for (let dayIdx = 0; dayIdx < 7; dayIdx++) {
       const d = new Date(mondayDate);
       d.setDate(mondayDate.getDate() + dayIdx);
+      d.setHours(0, 0, 0, 0);
 
-      const year = d.getFullYear();
-      const month = String(d.getMonth() + 1).padStart(2, '0');
-      const dateNum = String(d.getDate()).padStart(2, '0');
-      const dateStr = `${year}-${month}-${dateNum}`;
+      const dateStr = toLocalDateISO(d);
 
       const isToday = dateStr === todayISOStr;
       const isFuture = d.getTime() > today.getTime();
